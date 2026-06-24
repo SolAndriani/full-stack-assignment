@@ -65,7 +65,7 @@ Don't open a PR to this repo. Share your **fork URL**.
 
 In your forked repository, include a README that explains:
 
-- How to run your project.
-- What you'd improve or do differently if you had more time.
+- How to run your project.     
+- What you'd improve or do differently if you had more time.   
 
 Make sure your code runs locally based on the instructions in your README.
