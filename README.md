@@ -1,71 +1,86 @@
 # Worklo — Full-Stack Assignment
 
-Welcome to the Worklo Full-Stack Assignment!
+## How to Run This Project
 
-Worklo is a PSA (Professional Services Automation) platform for managing projects, tasks, time tracking, and client relationships. In this exercise you'll extend the existing codebase by building a real feature end-to-end — touching the database, backend API, and frontend UI.   
+1. Clone this repository and install dependencies:
 
-Focus on quality over completeness. Submit what you have when time is up.
+   ```bash
+   git clone https://github.com/SolAndriani/full-stack-assignment
+   cd full-stack-assignment
+   npm install
+   ```
 
-If you have any questions, feel free to reach out — we're happy to clarify anything.
+2. Set up environment variables:
 
-## Time Consideration
+   ```bash
+   cp .env.local.template .env.local
+   ```
 
-This assignment is scoped for **3–4 hours**. If you hit that limit, submit what you have and use `README.md` to describe what you'd finish next.
+   Fill in your Supabase project URL and keys in `.env.local`:
 
----    
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=
+   SUPABASE_SERVICE_ROLE_KEY=
+   SETUP_SECRET=
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   ```
 
-## Getting Started
+3. Run the database schema in the Supabase SQL Editor:
+   - Run `supabase/schema.sql`
+   - **Important:** the base schema is missing the `display_order` column on the `roles` table, which the existing `/api/roles` endpoint requires. Also run:
 
-You'll need **Node.js 18+** and a free [Supabase](https://supabase.com) project.
+   ```sql
+   alter table roles add column display_order integer not null default 0;
 
-```bash  
-# 1. Fork this repo and clone your fork
-npm install
+   with ordered as (
+     select id, row_number() over (order by hierarchy_level desc, name asc) as rn
+     from roles
+   )
+   update roles
+   set display_order = ordered.rn
+   from ordered
+   where roles.id = ordered.id;
+   ```
 
-# 2. Set up environment variables
-cp .env.local.template .env.local
-# Fill in your Supabase URL and keys
+4. Start the dev server:
 
-# 3. Run the database schema
-# → Supabase dashboard → SQL Editor → paste and run supabase/schema.sql
+   ```bash
+   npm run dev
+   ```
 
-# 4. Start the dev server
-npm run dev   # Next.js on http://localhost:3000
-```
+   App runs on `http://localhost:3000` (or the next available port).
 
----
+5. Complete onboarding to create a superadmin account, then visit `/admin`.
 
-## Task Overview
+## What I Built
 
-Build an **Admin panel** with a "Users" tab and a "Roles" tab so administrators can view, search, and manage the people and roles in their organization.
+### Users Tab
+- Table showing each user's name, email, avatar, and assigned role
+- Search input to filter users by name or email
+- Remove-user action via a delete button per row
 
-- Set up the "Users" and "Roles" tab structure under `/admin`
-- Add a users table that displays each user's name, email, avatar, and assigned role(s)
-- Add support for filtering the users table via a "Search" input field
-- Add support for removing a user from the organization via the "more" icon button dropdown menu
-- Add support for viewing all roles with their name, department, hierarchy level, and member count in the "Roles" tab
-- Add support for renaming a role inline in the "Roles" tab
-- [Bonus] Add cursor-based pagination to the users table
+### Roles Tab
+- Table showing each role's name, department, hierarchy level, and member count
+- Inline rename: click a role's name to edit it in place, save with Enter or the Save button, cancel with Escape
+- System roles (Superadmin, No Assigned Role) are not editable or deletable
 
----
+## Bugs Found & Fixed in the Base Repo
 
-## How We Evaluate
+While implementing the Roles tab, I found the existing codebase referenced things that didn't exist in the repo as cloned. I fixed these rather than working around them, since the same errors would block anyone else setting up the project:
 
-- **Full-stack integration** — data flows correctly end-to-end
-- **Backend awareness** — correct use of existing auth, error handling, and API patterns
-- **Frontend quality** — component structure, loading/error states, UX polish
-- **Code quality** — readable, typed, consistent with the existing codebase
-- **README.md** — clear reasoning about decisions and trade-offs
+1. **Missing `display_order` column** — `app/api/roles/route.js` selects and orders by `roles.display_order`, but `schema.sql` doesn't define this column, causing a 500 on `GET /api/roles`. Fixed via the migration above.
 
----
+2. **Missing `lib/role-management-service.js`** — `app/api/roles/[roleId]/route.js` imports `roleManagementService.updateRole()` for the PATCH (rename) endpoint, but this file didn't exist anywhere in the repo. I implemented it using the existing admin Supabase client pattern, restricting updatable fields to `name`, `description`, `department_id`, `permissions`, `reporting_role_id`, `hierarchy_level`, and `display_order`.
 
-## Submission Guidelines
+3. **Missing `lib/api-demo-guard.js`** — the same route imports `checkDemoModeForDestructiveAction()` for the DELETE endpoint, also missing from the repo. I implemented it to check `NEXT_PUBLIC_DEMO_MODE` and block destructive actions when true.
 
-Don't open a PR to this repo. Share your **fork URL**.
+## What I'd Improve With More Time
 
-In your forked repository, include a README that explains:
-
-- How to run your project.     
-- What you'd improve or do differently if you had more time.   
-
-Make sure your code runs locally based on the instructions in your README.
+- Add a "Create Role" flow validation and department dropdown check (currently assumes valid `department_id`)
+- Add optimistic UI updates for rename/delete instead of full reloads
+- Add cursor-based pagination to the Users table (bonus item, not implemented due to time)
+- Add unit tests for `role-management-service.js` and the roles API routes
+- Investigate why the base schema and API code were out of sync, in case other endpoints have the same class of issue
+- Add a loading skeleton instead of a plain "Loading..." text for both tabs
+- Debounce the user search input instead of filtering on every keystroke
